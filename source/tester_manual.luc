@@ -1,4 +1,4 @@
-module wrapper (
+module tester_manual_alu (
     input clk,
     input rst,
     input a[16],

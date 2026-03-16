@@ -20,7 +20,7 @@ module alchitry_top (
     }
 
     .clk(clk), .rst(rst) {
-        wrapper tester
+        tester_manual_alu tester
         tester_auto_alu auto_tester
         counter slow_clock(#DIV($is_sim() ? 9 : 25))
         multi_seven_seg seven_seg(#DIGITS(4))
