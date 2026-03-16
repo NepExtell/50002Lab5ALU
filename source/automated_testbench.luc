@@ -1,0 +1,279 @@
+module tester_auto_alu (
+    input clk,
+    input rst,
+    input slow_clock,
+    input start,
+    input alu_out[32],
+    input forced_error,
+    output a[32],
+    output b[32],
+    output out[32],
+    output alufn[6],
+    output tens_digit[4],
+    output ones_digit[4],
+    output state_bits[5],
+    output run_bit,
+    output error_bit  
+) {
+    const A_INPUTS = $reverse({
+        // ===== ADD/SUB =====
+        32d0,         // 00 ADD 0 + 0
+        32h7FFFFFFF,  // 01 ADD pos overflow
+        32d7,         // 02 SUB 7 - 5
+        32h80000000,  // 03 SUB neg overflow
+
+        // ===== Boolean =====
+        32hFF00FF00,  // 04 AND basic mask
+        32hAAAAAAAA,  // 05 AND no common bits
+        32hFF00FF00,  // 06 OR combine disjoint bits
+        32h12345678,  // 07 OR one side zero
+        32hDEADBEEF,  // 08 XOR identical inputs cancel
+        32hAAAAAAAA,  // 09 XOR alternating bits
+        32h12345678,  // 10 A pass-through ignores B
+        32h00000000,  // 11 A zero remains zero
+
+        // ===== Compare =====
+        32d5,  // 12. CMPEQ true (5 == 5)
+        32d0,  // 13. CMPEQ false (0 != 1)
+        -32d3, // 14. CMPLT true (-3 < 0)
+        32d0,  // 15. CMPLT true (0 < 1)
+        32d5,  // 16. CMPLT false (5 not < 3)
+        32d7,  // 17. CMPLE true (7 <= 7, equality)
+        -32d1, // 18. CMPLE true (-1 <= 0, less-than)
+        32d5,  // 19. CMPLE false (5 not <= 3)
+
+        // ===== Multiply =====
+        32d3,        // 20 small positive multiply
+        32d12345,    // 21 multiply by zero
+        -32d7,       // 22 negative × positive
+        -32d8,       // 23 negative × negative
+        32hFFFFFFFF, // 24 large values truncation
+        32h80000000, // 25 sign bit interaction
+        32d1024,     // 26 power-of-two scaling
+        32h7FFFFFFF, // 27 overflow wraps around
+
+        // ===== Shift =====
+        32h00000001, // 28 SHL 1 << 1
+        32h80000000, // 29 SHL overflow
+        32h00000008, // 30 SHR 8 >> 2
+        32h80000000, // 31 SHR logical
+        32h80000000, // 32 SRA arithmetic
+        32h80000000  // 33 SRA fill all ones
+    })
+
+    const B_INPUTS = $reverse({
+        // ===== ADD/SUB =====
+        32d0,  // 00
+        32d1,  // 01
+        32d5,  // 02
+        32d1,  // 03
+
+        // ===== Boolean =====
+        32h0F0F0F0F, // 04
+        32h55555555, // 05
+        32h00FF00FF, // 06
+        32h00000000, // 07
+        32hDEADBEEF, // 08
+        32h55555555, // 09
+        32hFFFFFFFF, // 10
+        32hDEADBEEF, // 11
+
+        // ===== Compare =====
+        32d5, // 12. CMPEQ true
+        32d1, // 13. CMPEQ false
+        32d0, // 14. CMPLT true
+        32d1, // 15. CMPLT true
+        32d3, // 16. CMPLT false
+        32d7, // 17. CMPLE true
+        32d0, // 18. CMPLE true
+        32d3, // 19. CMPLE false
+
+        // ===== Multiply =====
+        32d4,  // 20
+        32d0,  // 21
+        32d6,  // 22
+        -32d5, // 23
+        32d2,  // 24
+        32d2,  // 25
+        32d1024, // 26
+        32d2,  // 27
+
+        // ===== Shift =====
+        32d1,  // 28
+        32d1,  // 29
+        32d2,  // 30
+        32d1,  // 31
+        32d1,  // 32
+        32d31  // 33
+    })
+
+    const ALUFN_INPUTS = $reverse({
+        // ===== ADD/SUB =====
+        6h00, // 00
+        6h00, // 01
+        6h01, // 02
+        6h01, // 03
+
+        // ===== Boolean =====
+        6b011000, // 04 AND
+        6b011000, // 05 AND
+        6b011110, // 06 OR
+        6b011110, // 07 OR
+        6b010110, // 08 XOR
+        6b010110, // 09 XOR
+        6b011010, // 10 A
+        6b011010, // 11 A
+
+        // ===== Compare =====
+        6b110011, // 12 CMPEQ
+        6b110011, // 13 CMPEQ
+        6b110101, // 14 CMPLT
+        6b110101, // 15 CMPLT
+        6b110101, // 16 CMPLT
+        6b110111, // 17 CMPLE
+        6b110111, // 18 CMPLE
+        6b110111, // 19 CMPLE
+
+        // ===== Multiply =====
+        6b000010, // 20
+        6b000010, // 21
+        6b000010, // 22
+        6b000010, // 23
+        6b000010, // 24
+        6b000010, // 25
+        6b000010, // 26
+        6b000010, // 27
+
+        // ===== Shift =====
+        6b100000, // 28 SHL
+        6b100000, // 29 SHL
+        6b100001, // 30 SHR
+        6b100001, // 31 SHR
+        6b100011, // 32 SRA
+        6b100011  // 33 SRA
+    })
+
+    const RESULTS = $reverse({
+        // ===== ADD/SUB =====
+        32d0,         // 00
+        32h80000000,  // 01
+        32d2,         // 02
+        32h7FFFFFFF,  // 03
+
+        // ===== Boolean =====
+        32h0F000F00, // 04
+        32h00000000, // 05
+        32hFFFFFFFF, // 06
+        32h12345678, // 07
+        32h00000000, // 08
+        32hFFFFFFFF, // 09
+        32h12345678, // 10
+        32h00000000, // 11
+
+        // ===== Compare =====
+        32b1, // 12
+        32b0, // 13
+        32b1, // 14
+        32b1, // 15
+        32b0, // 16
+        32b1, // 17
+        32b1, // 18
+        32b0, // 19
+
+        // ===== Multiply =====
+        32d12,       // 20
+        32d0,        // 21
+        32hFFFFFFD6, // 22
+        32d40,       // 23
+        32hFFFFFFFE, // 24
+        32h00000000, // 25
+        32h00100000, // 26
+        32hFFFFFFFE, // 27
+
+        // ===== Shift =====
+        32d2,        // 28
+        32h00000000, // 29
+        32d2,        // 30
+        32h40000000, // 31
+        32hC0000000, // 32
+        32hFFFFFFFF  // 33
+    })
+
+    // BCD lookup
+    const TENS_LUT = $reverse({
+        4d0, 4d0, 4d0, 4d0, 4d0, 4d0, 4d0, 4d0, 4d0,
+        4d1, 4d1, 4d1, 4d1, 4d1, 4d1, 4d1, 4d1, 4d1, 4d1,
+        4d2, 4d2, 4d2, 4d2, 4d2, 4d2, 4d2, 4d2, 4d2, 4d2,
+        4d3, 4d3, 4d3, 4d3, 4d3
+    })
+
+    const ONES_LUT = $reverse({
+        4d1, 4d2, 4d3, 4d4, 4d5, 4d6, 4d7, 4d8, 4d9,
+        4d0, 4d1, 4d2, 4d3, 4d4, 4d5, 4d6, 4d7, 4d8, 4d9,
+        4d0, 4d1, 4d2, 4d3, 4d4, 4d5, 4d6, 4d7, 4d8, 4d9,
+        4d0, 4d1, 4d2, 4d3, 4d4
+    })
+
+    enum States {START, LOOP, CHECK_RESULT, HALT}
+
+    dff states[$width(States)](#INIT(States.START), .clk(clk), .rst(rst))
+    dff index[6](.clk(clk), .rst(rst), #INIT(0))
+
+    edge_detector rising_edge(.clk(clk), .in(slow_clock), #RISE(1), #FALL(0))
+    edge_detector rising_edge_start(.clk(clk), .in(start), #RISE(1), #FALL(0))
+
+    always {
+        state_bits = 5b0
+        run_bit = 0
+        error_bit = 0
+
+        states.d = states.q
+        index.d = index.q
+
+        a = A_INPUTS[index.q]
+        b = B_INPUTS[index.q]
+        alufn = ALUFN_INPUTS[index.q]
+        out = RESULTS[index.q]
+
+        tens_digit = TENS_LUT[index.q]
+        ones_digit = ONES_LUT[index.q]
+
+        case(states.q) {
+            States.START:
+                state_bits = 5b00001
+                run_bit = 1
+                if (rising_edge.out) states.d = States.LOOP
+
+            States.LOOP:
+                run_bit = 1
+                state_bits = 5b00010
+                if (rising_edge.out) states.d = States.CHECK_RESULT
+
+            States.CHECK_RESULT:
+                state_bits = 5b00011
+                run_bit = 1
+                if (|(alu_out ^ RESULTS[index.q]) | forced_error) {
+                    error_bit = 1
+                }
+                else {
+                    if (rising_edge.out) {
+                        if (~|(index.q ^ ($width(RESULTS, 0) - 1))) {
+                            states.d = States.HALT
+                        }
+                        else {
+                            index.d = index.q + 1
+                            states.d = States.LOOP
+                        }
+                    }
+                }
+
+            States.HALT:
+                state_bits = 5b11111
+                if (rising_edge_start.out) {
+                    index.d = 0
+                    run_bit = 0
+                    states.d = States.START
+                }
+        }
+    }
+}

@@ -1,0 +1,18 @@
+testbench rc {
+    sig clk
+
+    fun tick_clock() {
+        clk = 1
+        $silent_tick() // tick without capturing signals
+        clk = 0
+        $tick()
+    }
+    rca adder
+    test test_add_case_1{
+        adder.a = 8d3
+        adder.b = 8d5
+        adder.cin = 0
+        $tick()
+        $assert(adder.s == 8d8)
+    }
+}

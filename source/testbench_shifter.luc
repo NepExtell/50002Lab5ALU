@@ -1,0 +1,34 @@
+testbench testbench_shifter {
+    compact_shifter shifter
+    
+    // Format: c{a[32], b[5], alufn[6], expected[32]} = 75 bits total
+    const TEST_CASES_SHIFT = $reverse({
+        // 1. SHL: 1 << 1 = 2 (ALUFN: 100000)
+        c{32h00000001, 5d1,  6b100000, 32h00000002},
+        // 2. SHL: Overflow (0x80000000 << 1 = 0)
+        c{32h80000000, 5d1,  6b100000, 32h00000000},
+        // 3. SHR: 8 >> 2 = 2 (ALUFN: 100001)
+        c{32h00000008, 5d2,  6b100001, 32h00000002},
+        // 4. SHR: Logical (0x80000000 >> 1 = 0x40000000)
+        c{32h80000000, 5d1,  6b100001, 32h40000000},
+        // 5. SRA: Arithmetic (0x80000000 >>> 1 = 0xC0000000)
+        c{32h80000000, 5d1,  6b100011, 32hc0000000},
+        // 6. SRA: Fill all ones (0x80000000 >>> 31 = 0xFFFFFFFF)
+        c{32h80000000, 5d31, 6b100011, 32hffffffff}
+    })
+    
+    test shifterTest {
+        // Change loop count to match number of cases defined above (6)
+        repeat (i, 6){
+            shifter.a     = TEST_CASES_SHIFT[i][74:43] // First 32 bits
+            shifter.b     = TEST_CASES_SHIFT[i][42:38] // Next 5 bits
+            shifter.alufn = TEST_CASES_SHIFT[i][37:32] // Next 6 bits
+            
+            $tick()
+            
+            // Check output against last 32 bits of test case
+            $assert(shifter.out == TEST_CASES_SHIFT[i][31:0])
+            $print("PASS test case: %d", i+1)
+        }
+    }
+}
