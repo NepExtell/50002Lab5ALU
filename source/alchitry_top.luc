@@ -27,6 +27,7 @@ module alchitry_top (
     }
     
     beta_alu beta_alu
+    bin_to_dec bin_to_dec(#DIGITS(2), #LEADING_ZEROS(1))
 
     always {
         // Reset and serial loop
@@ -45,6 +46,8 @@ module alchitry_top (
         auto_tester.slow_clock = slow_clock.value
         auto_tester.forced_error = io_dip[2][7]
         auto_tester.alu_out = beta_alu.out
+        
+        bin_to_dec.value = auto_tester.index_out + 1
     
         // Default ALU inputs
         beta_alu.a = 0
@@ -66,6 +69,7 @@ module alchitry_top (
         // Connect 7-segment outputs
         io_segment = seven_seg.seg
         io_select  = seven_seg.sel
+        
     
         if(io_dip[2][6]) {
             beta_alu.a     = auto_tester.a
@@ -76,9 +80,12 @@ module alchitry_top (
             io_led[0] = auto_tester.out[7:0]
             io_led[2][2:0] = c{beta_alu.outz, beta_alu.outv, beta_alu.outn}
             led = auto_tester.state_bits
+            
+            io_led[2][7] = auto_tester.error_bit
+            io_led[2][6] = auto_tester.run_bit
         
-            seven_seg.values[0] = auto_tester.ones_digit
-            seven_seg.values[1] = auto_tester.tens_digit
+            seven_seg.values[0] = bin_to_dec.digits[0]
+            seven_seg.values[1] = bin_to_dec.digits[1]
             seven_seg.values[2] = 4h0
             seven_seg.values[3] = 4h0
         

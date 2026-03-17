@@ -9,9 +9,8 @@ module tester_auto_alu (
     output b[32],
     output out[32],
     output alufn[6],
-    output tens_digit[4],
-    output ones_digit[4],
     output state_bits[5],
+    output index_out[6],
     output run_bit,
     output error_bit  
 ) {
@@ -199,21 +198,6 @@ module tester_auto_alu (
         32hFFFFFFFF  // 33
     })
 
-    // BCD lookup
-    const TENS_LUT = $reverse({
-        4d0, 4d0, 4d0, 4d0, 4d0, 4d0, 4d0, 4d0, 4d0,
-        4d1, 4d1, 4d1, 4d1, 4d1, 4d1, 4d1, 4d1, 4d1, 4d1,
-        4d2, 4d2, 4d2, 4d2, 4d2, 4d2, 4d2, 4d2, 4d2, 4d2,
-        4d3, 4d3, 4d3, 4d3, 4d3
-    })
-
-    const ONES_LUT = $reverse({
-        4d1, 4d2, 4d3, 4d4, 4d5, 4d6, 4d7, 4d8, 4d9,
-        4d0, 4d1, 4d2, 4d3, 4d4, 4d5, 4d6, 4d7, 4d8, 4d9,
-        4d0, 4d1, 4d2, 4d3, 4d4, 4d5, 4d6, 4d7, 4d8, 4d9,
-        4d0, 4d1, 4d2, 4d3, 4d4
-    })
-
     enum States {START, LOOP, CHECK_RESULT, HALT}
 
     dff states[$width(States)](#INIT(States.START), .clk(clk), .rst(rst))
@@ -234,9 +218,8 @@ module tester_auto_alu (
         b = B_INPUTS[index.q]
         alufn = ALUFN_INPUTS[index.q]
         out = RESULTS[index.q]
-
-        tens_digit = TENS_LUT[index.q]
-        ones_digit = ONES_LUT[index.q]
+        
+        index_out = index.q
 
         case(states.q) {
             States.START:

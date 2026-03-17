@@ -166,6 +166,12 @@
                     "type": "DiskFile",
                     "path": "source/multi_seven_seg.luc"
                 }
+            },
+            {
+                "file": {
+                    "type": "Component",
+                    "path": "Miscellaneous/bin_to_dec.luc"
+                }
             }
         ],
         "constraintFiles": [
